@@ -152,6 +152,7 @@ def separate_lithology (data, litho_types):
     lito_code = np.array(lito_code)
     lito_code = lito_code[~np.isnan(lito_code)]
     lito_code = sorted(lito_code)
+    print(lito_code)
     
     lito_all = []
     gr_all = []
@@ -195,3 +196,38 @@ def separate_lithology (data, litho_types):
                 k += 1
     
     return litho
+
+
+def formation_zone(data, top, base, curve='all_curves'):
+    keys = list(data.keys())
+    for i in range(len(keys)):
+        if keys[i] == 'Depth':
+            value = i
+        elif keys[i] == curve:
+            index = i
+            
+    if curve == 'all_curves':
+        zone_all = []
+        for k in range (len(data)):
+            zone = []
+            for j in range(len(data[keys[value]])):
+                if data[keys[value]][j] > top and data[keys[value]][j] < base:
+                    depth = data[keys[k]][j]
+                    zone.append(depth)
+            zone_all.append(zone)
+            
+        formation = {}
+        for i in range(len(keys)):
+            formation[keys[i]] = np.array(zone_all[i])
+            
+    else:
+        zone = []
+        for j in range(len(data[keys[value]])):
+            if data[keys[value]][j] > top and data[keys[value]][j] < base:
+                depth = data[keys[index]][j]
+                zone.append(depth)
+    
+        formation = {}
+        formation[keys[index]] = np.array(zone)
+    
+    return formation
