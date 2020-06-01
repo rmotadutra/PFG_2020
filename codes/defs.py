@@ -21,50 +21,63 @@ def read_litho_types(path):
         
     Notes
     -----
+    The CSV file should not have blank spaces, all lines of the file must have the same length.
     The structure of the returned dictionary is a dictionary inside other dictionary and is specified below.
-    
     The first dictionary keys are the lithology names.
-    
     The second dictionary keys are the others sections of the CSV file: 'COLOR', 'CODE'.
     
     Examples
     --------
     
+    The examples below contains ficticious data.
+    
+    LITHOLOGY,COLOR,CODE
+    SANDSTONE,#ffff3f,49
+    SLURY,#7eff00,25
+    SHALE,#006400,57
+    SILTITE,#af1d4e,54
+ 
+    The example below contain how to import the CSV file above, and what it returns.
+    
+    >>> import defs
+    >>> csvfile = defs.read_litho_types('path/to/the/csv/file')
+    >>> csvfile
+    {'SANDSTONE': {'COLOR': '#ffff3f', 'CODE': '49'},
+     'SLURY': {'COLOR': '#7eff00', 'CODE': '25'},
+     'SHALE': {'COLOR': '#006400', 'CODE': '57'},
+     'SILTITE': {'COLOR': '#af1d4e', 'CODE': '54'}}
+    
     """
     import csv
     with open(path, errors="ignore") as csvfile:
         readCSV = csv.reader(csvfile, delimiter=',')
+        
         linhas = []
         for row in readCSV:
             linhas.append(row)
-
+            
         data = {}
-        lithology = []
-        color = []
-        code = []
-        for i in range(1, len(linhas)):
-            lithology.append(linhas[i][0])
-            color.append(linhas[i][1])
-            code.append(linhas[i][2])
-
-        ii=0
-        for i in lithology:
-            #print(i)
-            data[i] = {}
-            data[i][linhas[0][1]] = color[ii]
-            data[i][linhas[0][2]] = code[ii]
-            ii += 1
+        for j in range(len(linhas[0])):
+            lithology = []
+            for i in range(1, len(linhas)):
+                if j == 0:
+                    data[linhas[i][j]] = {}
+                else:
+                    data[linhas[i][0]][linhas[0][j]] = linhas[i][j]    
             
     return data
 
 
-def read_well(well_path):
+def read_well(path, logs):
     """Reads the contents of a LAS 2.0 file.
 
     Parameters
     ----------
-    well_path : string
+    path: string
         The path of the file to read.
+        
+    logs: list
+        The names of the curves to be imported.
 
     Returns
     -------
@@ -74,31 +87,37 @@ def read_well(well_path):
     Notes
     -----
     The structure of the returned dictionary is specified below.
-    The dictionary keys are the curves names: 'DEPTH', 'GR', 'NPHI', 'RHOB'.
-    Not all curves be present on the dictionary.
+    The dictionary keys are the curves names, that was reported in logs: 'DEPTH', 'GR', 'NPHI', 'RHOB'.
+    Not all curves of the LAS file necessarily will be present on the dictionary.
 
     The value of each curve section is a numpy ndarray where contains the data from a well log.
 
     Examples
     --------
+    
+    The examples below contains ficticious data.
+    The example below contain how to import a LAS file, and what returns.
+    
+    >>> import defs
+    >>> lasfile = defs.read_well('path/to/the/las/file', ['DEPTH', 'GR', 'NPHI', 'RHOB'])
+    >>> lasfile
+    {'DEPTH': array([-4.5720000e-01, -3.0480000e-01, -1.5240000e-01, ...,
+             3.5643312e+03,  3.5644836e+03,  3.5646360e+03]),
+     'GR': array([  5.0502,   4.1305,   3.8073, ..., 125.6342, 125.6342, 125.6342]),
+     'NPHI': array([-0.0517, -0.0541, -0.0101, ...,     nan,     nan,     nan]),
+     'RHOB': array([nan, nan, nan, ..., nan, nan, nan])}
+    
     """
     
     import las2 as las
-    data = las.read(well_path)
-    for i in range(len(data['curve'])):
-        if data['curve'][i]['mnemonic'] == 'DEPTH':
-            depth = data['data'][i]
-        elif data['curve'][i]['mnemonic'] == 'GR':
-            gr = data['data'][i]
-        elif data['curve'][i]['mnemonic'] == 'NPHI':
-            nphi = data['data'][i]
-        elif data['curve'][i]['mnemonic'] == 'RHOB':
-            rhob = data['data'][i]
-            
-    curves = {'Depth': depth,
-              'GR': gr,
-              'NPHI': nphi,
-              'RHOB': rhob}
+    data = las.read(path)
+
+    curves = {}
+    for j in logs:
+        for i in range(len(data['curve'])):
+            if data['curve'][i]['mnemonic'] == j:
+                curves[j] = data['data'][i]
+                
     return curves
 
 def drdn (rhob, nphi):
@@ -107,18 +126,25 @@ def drdn (rhob, nphi):
     Parameters
     ----------
     rhob : numpy ndarray
-        The data of the RHOB curve.
+        Data from RHOB curve.
         
     nphi : numpy ndarray
-        The data of the NPHI curve.
+        Data from NPHI curve.
 
     Returns
     -------
-    drdn
+    numpy ndarray
         A numpy ndarray containing the data of the DRDN curve.
     
     Examples
     --------
+    
+    The examples below contains ficticious data.
+    
+    >>> import defs
+    >>> drdn = defs.drdn(RHOB, NPHI)
+    >>> drdn
+    array([nan, 5.3107, 4.7127, ..., 4.4874, 4.2507, nan])
     
     """
     drdn = ((rhob-2)/0.05) - ((0.45 - nphi)/0.03)
@@ -146,25 +172,68 @@ def create_lithology(drdn):
     return lit_py
 
 def separate_lithology (data, litho_types):
-    lito_code = []
-    for lito in set(data['LITHOLOGY']):
-        lito_code.append(lito)
-    lito_code = np.array(lito_code)
-    lito_code = lito_code[~np.isnan(lito_code)]
-    lito_code = sorted(lito_code)
-    print(lito_code)
+    """Create separate well logs for each lithology.
+
+    Parameters
+    ----------
+    data: dict
+        The data that contains informations about the logs.
+        
+    litho_types: dict
+        A dict that contains all the lithologies present in the well and its codes.
+
+    Returns
+    -------
+    dict
+        An updated dictionary containing curves for each lithologies.
+
+    Notes
+    -----
+    All input data is preserved, and the dict updated with logs from each lithology (GR, RHOB, NPHI) 
+
+    The value of each curve section is a numpy ndarray that contains the data from a well log.
+
+    Examples
+    --------
     
-    lito_all = []
-    gr_all = []
-    nphi_all = []
-    rhob_all = []
-    for i in range(len(lito_code)):
-        lito1 = []
+    The examples below contains ficticious data.
+    
+    >>> import defs
+    >>> separate_well = defs.separate_lithology(data, litho_types)
+    >>> separate_well
+    {'DEPTH': array([-4.5720000e-01, -3.0480000e-01, -1.5240000e-01, ...,
+             3.5643312e+03,  3.5644836e+03,  3.5646360e+03]),
+     'GR': array([  5.0502,   4.1305,   3.8073, ..., 125.6342, 125.6342, 125.6342]),
+     'NPHI': array([-0.0517, -0.0541, -0.0101, ...,     nan,     nan,     nan]),
+     'RHOB': array([nan, nan, nan, ..., nan, nan, nan]),
+     'DRDN': array([nan, nan, nan, ..., nan, nan, nan]),
+     'LITHOLOGY': array([nan, nan, nan, ..., nan, nan, nan]),
+     'SANDSTONE': {'LITHOLOGY': array([nan, nan, nan, ..., nan, nan, nan]),
+      'GR': array([nan, nan, nan, ..., nan, nan, nan]),
+      'NPHI': array([nan, nan, nan, ..., nan, nan, nan]),
+      'RHOB': array([nan, nan, nan, ..., nan, nan, nan])},
+     'SLURY': {'LITHOLOGY': array([nan, nan, nan, ..., nan, nan, nan]),
+      'GR': array([nan, nan, nan, ..., nan, nan, nan]),
+      'NPHI': array([nan, nan, nan, ..., nan, nan, nan]),
+      'RHOB': array([nan, nan, nan, ..., nan, nan, nan])},
+     'SHALE': {'LITHOLOGY': array([nan, nan, nan, ..., nan, nan, nan]),
+      'GR': array([nan, nan, nan, ..., nan, nan, nan]),
+      'NPHI': array([nan, nan, nan, ..., nan, nan, nan]),
+      'RHOB': array([nan, nan, nan, ..., nan, nan, nan])},
+     'SILTITE': {'LITHOLOGY': array([nan, nan, nan, ..., nan, nan, nan]),
+      'GR': array([nan, nan, nan, ..., nan, nan, nan]),
+      'NPHI': array([nan, nan, nan, ..., nan, nan, nan]),
+      'RHOB': array([nan, nan, nan, ..., nan, nan, nan])}}
+    
+    """
+    
+    for i in range(len(litho_types)):
+        lito = []
         gr_lito = []
         nphi_lito = []
         rhob_lito = []
-        for j in range(len(data['Depth'])):
-            if data['LITHOLOGY'][j] == lito_code[i]:
+        for j in range(len(data['DEPTH'])):
+            if data['LITHOLOGY'][j] == int(litho_types[list(litho_types.keys())[i]]['CODE']):
                 value = data['LITHOLOGY'][j]
                 gr = data['GR'][j]
                 nphi = data['NPHI'][j]
@@ -174,60 +243,218 @@ def separate_lithology (data, litho_types):
                 gr = np.nan
                 nphi = np.nan
                 rhob = np.nan
-            lito1.append(value)
+            lito.append(value)
             gr_lito.append(gr)
             nphi_lito.append(nphi)
             rhob_lito.append(rhob)
-        lito_all.append(lito1)
-        gr_all.append(gr_lito)
-        nphi_all.append(nphi_lito)
-        rhob_all.append(rhob_lito)
+        data[list(litho_types.keys())[i]] = {}
+        data[list(litho_types.keys())[i]]['LITHOLOGY'] = np.array(lito)
+        data[list(litho_types.keys())[i]]['GR'] = np.array(gr_lito)
+        data[list(litho_types.keys())[i]]['NPHI'] = np.array(nphi_lito)
+        data[list(litho_types.keys())[i]]['RHOB'] = np.array(rhob_lito)
     
-    litho ={}
-    k = 0
-    for i in lito_code:
-        for j in litho_types:
-            if int(litho_types[j]['CODE']) == int(i):
-                litho[j] = {}
-                litho[j]['LITHOLOGY'] = np.array(lito_all[k])
-                litho[j]['GR'] = np.array(gr_all[k])
-                litho[j]['NPHI'] = np.array(nphi_all[k])
-                litho[j]['RHOB'] = np.array(rhob_all[k])
-                k += 1
-    
-    return litho
+    return data
 
 
-def formation_zone(data, top, base, curve='all_curves'):
-    keys = list(data.keys())
-    for i in range(len(keys)):
-        if keys[i] == 'Depth':
-            value = i
-        elif keys[i] == curve:
-            index = i
-            
-    if curve == 'all_curves':
-        zone_all = []
-        for k in range (len(data)):
-            zone = []
-            for j in range(len(data[keys[value]])):
-                if data[keys[value]][j] > top and data[keys[value]][j] < base:
-                    depth = data[keys[k]][j]
-                    zone.append(depth)
-            zone_all.append(zone)
-            
-        formation = {}
-        for i in range(len(keys)):
-            formation[keys[i]] = np.array(zone_all[i])
-            
+def formation_zone(data, top, base, curve=False):
+    """Set a new top and base for the curves selected.
+
+    Parameters
+    ----------
+    data : dict
+        The data of the well.
+        
+    top : integer or float
+        The new top depth.
+    
+    base: integer or float
+        The new base depth.
+        
+    curve: list
+        List with all curves that will be set a new top and base.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the new data range of the selected curves.
+        
+    Notes
+    -----
+    
+    If "curves" are not given, all the keys from "data" will be set in a new top and base.
+    
+    Examples
+    --------
+    
+    The example below contains ficticious data.
+    
+    >>> import defs
+    >>> zone = defs.formation_zone(data, 300.0, 2600.0, ['DEPTH', 'RHOB', 'NPHI'])
+    >>> zone
+    {'DEPTH': array([300.122 , 300.2744, 300.4268, ..., 2500.6636, 2500.816 ,
+            2600.0]),
+    'RHOB': array([2.6524, 2.6342, 2.6136, ..., 2.4002, 2.4042, 2.4056]),
+    'NPHI': array([0.1985, 0.2366, 0.2627, ..., 0.3183, 0.2826, 0.2691])}
+    
+    """
+    
+    if curve:
+        curve = curve
     else:
+        curve = list(data.keys())
+        
+    formation = {}
+    for i in range (len(curve)):
         zone = []
-        for j in range(len(data[keys[value]])):
-            if data[keys[value]][j] > top and data[keys[value]][j] < base:
-                depth = data[keys[index]][j]
-                zone.append(depth)
-    
-        formation = {}
-        formation[keys[index]] = np.array(zone)
+        for j in range(len(data['DEPTH'])):
+            if data['DEPTH'][j] > top and data['DEPTH'][j] < base:
+                value = data[curve[i]][j]
+                zone.append(value)
+        formation[curve[i]] = np.array(zone)
     
     return formation
+
+def statistic_lithology(data, lithology, curve, step, top = False, base = False):
+    """Calculates the statistics for each lithology and for each curve.
+
+    Parameters
+    ----------
+    data : dict
+        The data of the well.
+        
+    lithology: list
+        List with all lithologies that will calculate the statistics.
+        
+    curve: list
+        List with all curves that will calculate the statistics.
+        
+    step: integer or float
+        The value that the ranges will be divided.
+        
+    top : integer or float
+        In what depth start the statistics.
+    
+    base: integer or float
+        In what depth stop the statistics.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the new statistics data of the selected curves and the selected lithologies.
+        
+    Notes
+    -----
+    
+    It's possible to give the "curve" list and the "lithology" list in any order.
+    
+    If "top" and "base" are not given, the range of all well will be set to calculate the statistics.
+    
+    Examples
+    --------
+    
+    The example below contains ficticious data.
+    
+    >>> import defs
+    >>> statistics = defs.statistics_lithology(data, ['SANDSTONE'], ['RHOB'], 50.0, 2500, 3100)
+    >>> zone
+    {'DEPTH': array([2500.122 , 2500.2744, 2500.4268, ..., 3099.6636, 3099.816 ,
+            3100.0]),
+    'RHOB': array([2.6524, 2.6342, 2.6136, ..., 2.4002, 2.4042, 2.4056]),
+    'NPHI': array([0.1985, 0.2366, 0.2627, ..., 0.3183, 0.2826, 0.2691]),
+    'SANDSTONE': 'RHOB': {'Mean': {'2500.0-2550.0': nan,
+                            '2550.0-2600.0': 37.74879393939394,
+                            '2600.0-2650.0': 38.3727392,
+                            '2650.0-2700.0': 38.270216201117314,
+                            '2700.0-2750.0': 38.322155092592595,
+                            '2750.0-2800.0': 40.29478794326241,
+                            '2800.0-2850.0': 45.15985242290749,
+                            '2850.0-2900.0': 46.77599699812383,
+                            '2900.0-2950.0': 48.24150915697675,
+                            '2950.0-3000.0': 48.62925721703012,
+                            '3000.0-3050.0': 48.217977280858676,
+                            '3050.0-3100.0': 48.217977280858676}
+                          }
+    }
+    
+    """
+    if top:
+        top = top
+    else:
+        top = min(data['DEPTH'])
+        
+    if base:
+        base = base
+    else:
+        base = max(data['DEPTH'])
+    
+    n_depth = []
+    while top <= base:
+        n_depth.append(top)
+        top = top + step
+
+    for l in lithology:
+        for k in curve:
+            curve_save = np.array(data[l][k])
+            data[l][k] = {}
+            data[l][k]['Mean'] = {}
+            data[l][k]['Std'] = {}
+            for j in range (len(n_depth)-1):
+                curve_interval = []
+                for i, depth in enumerate(data['DEPTH']):
+                    if depth >= n_depth[j] and depth < n_depth[j+1] and depth <= base:
+                        curve_interval.append(curve_save[i])
+                curve_interval2 = np.array(curve_interval)
+                if curve_interval2.all() == np.nan:
+                    mean = np.nan
+                    std = np.nan
+                else:
+                    mean = np.nanmean(np.array(curve_interval))
+                    std = np.nanstd(np.array(curve_interval))
+                data[l][k]['Mean'][str(n_depth[j]) + '-' + str(n_depth[j+1])] = mean
+                data[l][k]['Std'][str(n_depth[j]) + '-' + str(n_depth[j+1])] = std   
+        
+    return data
+
+def sort_curve (data, statistic, litho_types, curve, step, top=False, base=False):
+    
+    import random
+    
+    if top:
+        top = top
+    else:
+        top = min(data['DEPTH'])
+
+    if base:
+        base = base
+    else:
+        base = max(data['DEPTH'])
+
+    n_depth = []
+    while top <= base:
+        n_depth.append(top)
+        top = top + step
+        
+    sort_log = []
+    for i in range(len(data['LITHOLOGY'])):
+        if np.isnan(data['LITHOLOGY'][i]):
+            value = np.nan
+        else:
+            for k in range(len(n_depth)):
+                for j in range(len(litho_types)):
+                    if int(data['LITHOLOGY'][i]) == int(litho_types[list(litho_types.keys())[j]]['CODE']) and data['DEPTH'][i] >= n_depth[k] and data['DEPTH'][i] <= n_depth[k+1] and data['DEPTH'][i] <= base:
+                        if np.isnan(statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]):
+                            while np.isnan(statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]):
+                                k = k-1
+                            mean = statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]
+                        else:
+                            mean = statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]
+                        if np.isnan(statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]):
+                            while np.isnan(statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]):
+                                k = k-1
+                            std = statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]
+                        else:
+                            std = statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]
+                        value = random.gauss(mean,std)
+        sort_log.append(value)
+    
+    return np.array(sort_log)
