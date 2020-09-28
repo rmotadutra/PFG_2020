@@ -118,6 +118,33 @@ def cropar_limpo_2(profundidade,curvas,topo=0,base=20000,nulos=False):
 
 # ------------------------------------------------------------- #
 
+def cropar_limpo(profundidade,curvas,topo=0,base=20000,nulos=False):
+
+    novas_curvas = []
+    for j in range(len(curvas)):
+        curva = []
+        profundiade_cropada = []
+        for i in range(len(profundidade)):
+            if profundidade[i] >= topo and profundidade[i] < base:
+                curva.append(curvas[j][i])
+                profundiade_cropada.append(profundidade[i])
+        novas_curvas.append(curva)
+
+    novas_curvas_final = []
+    novas_curvas_final.append(profundiade_cropada)
+    for i in range(len(curvas)):
+        novas_curvas_final.append(novas_curvas[i])
+
+    a = np.array(novas_curvas_final).T
+
+    b = a[~np.isnan(a).any(axis=1)]
+    if nulos:
+        b = b[~np.isin(b,nulos).any(axis=1)]
+
+    return list(b.T)
+
+# ------------------------------------------------------------- #
+
 class correcao_profundidade():
     
     def __init__(self,prof,c):
