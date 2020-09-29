@@ -389,9 +389,7 @@ def statistic_lithology(data, lithology, curves, step, top = False, base = False
                 
     return data
 
-def sort_curve (data, statistic, litho_types, curve, step, top=False, base=False):
-    
-    import random
+def sort_curve(data, statistic, litho_types, curve, step, top=False, base=False):
     
     if top:
         top = top
@@ -408,27 +406,21 @@ def sort_curve (data, statistic, litho_types, curve, step, top=False, base=False
         n_depth.append(top)
         top = top + step
         
-    sort_log = []
-    for i in range(len(data['LITHOLOGY'])):
-        if np.isnan(data['LITHOLOGY'][i]):
-            value = np.nan
-        else:
-            for k in range(len(n_depth)):
-                for j in range(len(litho_types)):
-                    if int(data['LITHOLOGY'][i]) == int(litho_types[list(litho_types.keys())[j]]['CODE']) and data['DEPTH'][i] >= n_depth[k] and data['DEPTH'][i] <= n_depth[k+1] and data['DEPTH'][i] <= base:
-                        if np.isnan(statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]):
-                            while np.isnan(statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]):
-                                k = k-1
-                            mean = statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]
-                        else:
-                            mean = statistic[list(litho_types.keys())[j]][curve]['Mean'][list(statistic[list(litho_types.keys())[j]][curve]['Mean'])[k]]
-                        if np.isnan(statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]):
-                            while np.isnan(statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]):
-                                k = k-1
-                            std = statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]
-                        else:
-                            std = statistic[list(litho_types.keys())[j]][curve]['Std'][list(statistic[list(litho_types.keys())[j]][curve]['Std'])[k]]
-                        value = random.gauss(mean,std)
-        sort_log.append(value)
-    
-    return np.array(sort_log)
+    tops = n_depth[0:-1]
+    bases = n_depth[1:]
+        
+    value = np.full(len(data['LITHOLOGY']), np.nan)
+    for i, (t, b) in enumerate(zip(tops, bases)):
+        for lith in litho_types:
+            w = (data['DEPTH'] >= t) & (data['DEPTH'] <= b) & (data['LITHOLOGY'] == int(litho_types[lith]['CODE']))
+            mean = np.full(len(data['LITHOLOGY']), np.nan)
+            mean[w] = list(statistic[lith]['GR']['Mean'].values())[i]
+            std = np.full(len(data['LITHOLOGY']), np.nan)
+            std[w] = list(statistic[lith]['GR']['Std'].values())[i]
+            while np.isnan(mean[w].any()):
+                i = i-1
+                mean[w] = list(statistic[lith]['GR']['Mean'].values())[i]
+                std[w] = list(statistic[lith]['GR']['Std'].values())[i]
+            value[w] = np.random.normal(mean[w], std[w])
+            
+    return value
