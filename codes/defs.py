@@ -436,3 +436,28 @@ def sort_curve(data, statistic, litho_types, curve, step, top=False, bottom=Fals
             value[w] = np.random.normal(mean[w], std[w])
             
     return value
+
+
+def corrcoef(steps, curve, depth):
+    passos = steps
+
+    coeficientes_correlação = []
+    intervalo_profundidade = []
+
+    for passo in range(passos): # 'passo' vai de 0 a 300
+
+        # ------------------------------------------ #
+
+        valor_h = [] # h  de head ou cabeça
+        valor_t = [] # t de tail ou cauda
+
+        for i in range(len(curve)-passo): # range menor que o passo para evitar o acesso em indices mais altos e não existentes
+            valor_t.append(curve[i+passo])
+            valor_h.append(curve[i])
+
+        coeficientes_correlação.append(np.corrcoef(valor_h,valor_t)[1][0])
+        intervalo_profundidade.append(depth[0+passo] - depth[0])
+
+    # ------------------------------------------ #
+    
+    return intervalo_profundidade, coeficientes_correlação
