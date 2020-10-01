@@ -292,7 +292,7 @@ def formation_zone(data, top, base, curve=False):
     
     return formation
 
-def statistic_lithology(data, lithology, curves, step, top = False, base = False):
+def statistic_lithology(data, lithology, curves, step, top=False, bottom=False, overlap=False):
     """Calculates the statistics for each lithology and for each curve.
 
     Parameters
@@ -359,19 +359,25 @@ def statistic_lithology(data, lithology, curves, step, top = False, base = False
         top = top
     else:
         top = min(data['DEPTH'])
-        
-    if base:
-        base = base
+
+    if bottom:
+        bottom = bottom
     else:
-        base = max(data['DEPTH'])
-    
-    n_depth = []
-    while top <= base:
-        n_depth.append(top)
-        top = top + step
-    
-    tops = n_depth[0:-1]
-    bases = n_depth[1:]
+        bottom = max(data['DEPTH'])
+
+    if overlap:
+        overlap = overlap
+    else:
+        overlap = 0.0
+
+    tops = []
+    bases = []
+    base = top+step
+    while base <= bottom:
+        tops.append(top)
+        bases.append(base)
+        top = top + step - step*overlap
+        base = base + step - step*overlap
     
     for lith in lithology:
         for curve in curves:
@@ -389,38 +395,44 @@ def statistic_lithology(data, lithology, curves, step, top = False, base = False
                 
     return data
 
-def sort_curve(data, statistic, litho_types, curve, step, top=False, base=False):
+def sort_curve(data, statistic, litho_types, curve, step, top=False, bottom=False, overlap=False):
     
     if top:
         top = top
     else:
         top = min(data['DEPTH'])
 
-    if base:
-        base = base
+    if bottom:
+        bottom = bottom
     else:
-        base = max(data['DEPTH'])
-
-    n_depth = []
-    while top <= base:
-        n_depth.append(top)
-        top = top + step
+        bottom = max(data['DEPTH'])
         
-    tops = n_depth[0:-1]
-    bases = n_depth[1:]
+    if overlap:
+        overlap = overlap
+    else:
+        overlap = 0.0
+    
+    tops = []
+    bases = []
+    base = top+step
+    while base <= bottom:
+        tops.append(top)
+        bases.append(base)
+        top = top + step - step*overlap
+        base = base + step - step*overlap
         
     value = np.full(len(data['LITHOLOGY']), np.nan)
     for i, (t, b) in enumerate(zip(tops, bases)):
         for lith in litho_types:
             w = (data['DEPTH'] >= t) & (data['DEPTH'] <= b) & (data['LITHOLOGY'] == int(litho_types[lith]['CODE']))
             mean = np.full(len(data['LITHOLOGY']), np.nan)
-            mean[w] = list(statistic[lith]['GR']['Mean'].values())[i]
+            mean[w] = list(statistic[lith][curve]['Mean'].values())[i]
             std = np.full(len(data['LITHOLOGY']), np.nan)
-            std[w] = list(statistic[lith]['GR']['Std'].values())[i]
+            std[w] = list(statistic[lith][curve]['Std'].values())[i]
             while np.isnan(mean[w].any()):
                 i = i-1
-                mean[w] = list(statistic[lith]['GR']['Mean'].values())[i]
-                std[w] = list(statistic[lith]['GR']['Std'].values())[i]
+                mean[w] = list(statistic[lith][curve]['Mean'].values())[i]
+                std[w] = list(statistic[lith][curve]['Std'].values())[i]
             value[w] = np.random.normal(mean[w], std[w])
             
     return value
