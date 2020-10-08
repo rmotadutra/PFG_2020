@@ -229,9 +229,9 @@ def separate_lithology(data, litho_types, curves):
     well = data   
     for lith in litho_types:
         well[lith] = {}
-        w = data['LITHOLOGY'] == int(litho_types[lith]['CODE'])
+        w = data[curves[0]] == int(litho_types[lith]['CODE'])
         for curve in curves:
-            well[lith][curve] = np.full(len(data['LITHOLOGY']), np.nan)
+            well[lith][curve] = np.full(len(data[curves[0]]), np.nan)
             well[lith][curve][w] = data[curve][w]
     
     return well
@@ -386,16 +386,26 @@ def statistic_lithology(data, lithology, curves, step, top=False, bottom=False, 
             data[lith][curve]['Data'] = curve_save
             data[lith][curve]['Mean'] = {}
             data[lith][curve]['Std'] = {}
+            mean = []
+            std = []
             for t, b in zip(tops, bases):
                 w = (data['DEPTH'] >= t) & (data['DEPTH'] <= b)
-                mean = np.nanmean(curve_save[w])
-                std = np.nanstd(curve_save[w])
-                data[lith][curve]['Mean'][str(t) + '-' + str(b)] = mean
-                data[lith][curve]['Std'][str(t) + '-' + str(b)] = std
+                m = np.nanmean(curve_save[w])
+                s = np.nanstd(curve_save[w])
+                mean.append(m)
+                std.append(s)
+            data[lith][curve]['Mean']['Top'] = tops
+            data[lith][curve]['Mean']['Base'] = bases
+            data[lith][curve]['Mean']['Value'] = mean
+            data[lith][curve]['Std']['Top'] = tops
+            data[lith][curve]['Std']['Base'] = bases
+            data[lith][curve]['Std']['Value'] = std
                 
     return data
 
-def sort_curve(data, statistic, litho_types, curve, step, top=False, bottom=False, overlap=False):
+def sort_curve(data, statistic, litho_types, curve, step, top=False, bottom=False):
+    
+    import copy
     
     if top:
         top = top
@@ -406,36 +416,28 @@ def sort_curve(data, statistic, litho_types, curve, step, top=False, bottom=Fals
         bottom = bottom
     else:
         bottom = max(data['DEPTH'])
-        
-    if overlap:
-        overlap = overlap
-    else:
-        overlap = 0.0
     
-    tops = []
-    bases = []
-    base = top+step
-    while base <= bottom:
-        tops.append(top)
-        bases.append(base)
-        top = top + step - step*overlap
-        base = base + step - step*overlap
-        
-    value = np.full(len(data['LITHOLOGY']), np.nan)
-    for i, (t, b) in enumerate(zip(tops, bases)):
+    gr = np.full(len(data['DEPTH']), np.nan)
+    
+    
+    for (i, depth) in enumerate(data['DEPTH']):
         for lith in litho_types:
-            w = (data['DEPTH'] >= t) & (data['DEPTH'] <= b) & (data['LITHOLOGY'] == int(litho_types[lith]['CODE']))
-            mean = np.full(len(data['LITHOLOGY']), np.nan)
-            mean[w] = list(statistic[lith][curve]['Mean'].values())[i]
-            std = np.full(len(data['LITHOLOGY']), np.nan)
-            std[w] = list(statistic[lith][curve]['Std'].values())[i]
-            while np.isnan(mean[w].any()):
-                i = i-1
-                mean[w] = list(statistic[lith][curve]['Mean'].values())[i]
-                std[w] = list(statistic[lith][curve]['Std'].values())[i]
-            value[w] = np.random.normal(mean[w], std[w])
-            
-    return value
+            tops = copy.deepcopy(statistic[lith][curve]['Mean']['Top'])
+            bases = copy.deepcopy(statistic[lith][curve]['Mean']['Base'])
+            mean = copy.deepcopy(statistic[lith][curve]['Mean']['Value'])
+            std = copy.deepcopy(statistic[lith][curve]['Std']['Value'])
+            if (depth >= top) & (depth <= bottom) & (data['LITHOLOGY'][i] == int(litho_types[lith]['CODE'])):
+                d = list(abs(depth-tops)+abs(depth-bases))
+                index = d.index(min(d))
+                while (np.isnan(mean[index])) and (len(d) > 1):
+                    d.pop(index)
+                    mean.pop(index)
+                    std.pop(index)
+                    index = d.index(min(d))
+                value = np.random.normal(mean[index], std[index])
+                gr[i] = value
+    
+    return np.array(gr)
 
 
 def corrcoef(steps, curve, depth):
