@@ -111,6 +111,7 @@ class plotagem:
         if indice == 0:
             self.ax[indice].set_ylabel(descricao_y, fontsize=fonte_descricao)
         self.ax[indice].set_xlabel(descricao_x, fontsize=fonte_descricao)
+        self.ax[indice].set_xticklabels([])
         self.ax[indice].set_title(titulo, fontsize=fonte_titulo)
         
         self.ax[indice].patch.set_facecolor(self.cor_plot_fundo)
