@@ -20,12 +20,12 @@ class plotagem:
                 cor_fundo = 'white',transparencia_fundo = 0.5,
                 cor_plot_fundo = 'white',transparencia_plot_fundo = 1.0):
         self.ax = [0]*n
-        fig, (self.ax) = plt.subplots(1,n,sharey=eixoy,figsize=(comprimento, altura),
+        self.fig, (self.ax) = plt.subplots(1,n,sharey=eixoy,figsize=(comprimento, altura),
                                  dpi=dpi)
-        fig.suptitle(titulo, fontsize=titulo_fonte)
+        self.fig.suptitle(titulo, fontsize=titulo_fonte)
         
-        fig.patch.set_facecolor(cor_fundo)
-        fig.patch.set_alpha(transparencia_fundo)
+        self.fig.patch.set_facecolor(cor_fundo)
+        self.fig.patch.set_alpha(transparencia_fundo)
         
         self.cor_plot_fundo = cor_plot_fundo
         self.transparencia_plot_fundo = transparencia_plot_fundo
@@ -121,7 +121,7 @@ class plotagem:
         plt.show()
         
     def salvar(self,caminho):
-        fig.savefig(caminho, transparent=True)
+        self.fig.savefig(caminho, transparent=True)
         
 # --------------------------------------------------------------------------- #
 # ###

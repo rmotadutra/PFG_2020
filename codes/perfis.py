@@ -348,7 +348,7 @@ class plotagem:
             padrao['linha_espessura'] = 0.00
         
         for i in range(num_cores):
-            self.ax[indice].plot(matriz_litologias[i],Y,c = relacao_cor[codigos[i]][0],linewidth = padrao['linha_espessura'])
+            self.ax[indice].plot(matriz_litologias[i],Y,c = relacao_cor[codigos[i]][0],linewidth = padrao['linha_espessura'], alpha=self.padrao_usuario['plot_fundo_transparencia'])
             self.ax[indice].fill_betweenx(Y,curva_de_base, matriz_litologias[i], facecolor=relacao_cor[codigos[i]][0],
                                           label=relacao_cor[codigos[i]][1])
             
